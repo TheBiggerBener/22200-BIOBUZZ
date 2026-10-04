@@ -190,14 +190,14 @@ public class LlDrivemode extends LinearOpMode {
                 launcher_velocity = 1500.0;
             }
 
-            if (gamepad2.right_trigger > 0) {
+            /* if (gamepad2.right_trigger > 0) {
                 launcher.setVelocity(launcher_velocity);
             } else if (gamepad2.left_trigger > 0) {
                 launcher.setPower(-1.0);
             } else {
                 launcher.setPower(0.0);
             }
-
+            */
 
             double speedMultiplier = 1.0;
             if (gamepad1.left_trigger > 0.5) {
@@ -297,7 +297,7 @@ public class LlDrivemode extends LinearOpMode {
             }
 
 
-            // Press a to turn on auto-aim (limelight)
+            /* Press a to turn on auto-aim (limelight)
             if (gamepad1.right_trigger > 0.0 && isValid) {
                 double tx = llResult.getTx();
                 // 'amt' of turn
@@ -320,6 +320,7 @@ public class LlDrivemode extends LinearOpMode {
                 telemetry.addData("Left/Right offset: ", tx);
                 telemetry.addData("Turn Power: ", turnPower);
             }
+            */
             // Regular Motor Controls
             frontLeft.setPower(fL_Motor);
             backLeft.setPower(bL_Motor);
@@ -327,15 +328,15 @@ public class LlDrivemode extends LinearOpMode {
             backRight.setPower(bR_Motor);
 
             // Intake motor's control
-            if (gamepad2.right_trigger > 0.0) { intake.setPower(gamepad2.right_trigger); } else { intake.setPower(0.0); }
+            if (gamepad2.right_trigger > 0.0) { intake.setPower(gamepad2.right_trigger); } else if (gamepad2.left_trigger > 0.0){ intake.setPower(-gamepad2.left_trigger); } else { intake.setPower(0.0); }
 
-            // launcher brake toggler
+            /* launcher brake toggler
             if (gamepad2.left_bumper) {
                 launcher.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
             } else {
                 launcher.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
             }
-
+            */
 
             //Incremental velocity power for the launcher
             if (gamepad2.left_stick_y > 0.0) {
