@@ -37,8 +37,8 @@ public class LlDrivemode extends LinearOpMode {
     // General variable set up
     double launcher_velocity = 3000.0;
     GoBildaPinpointDriver odo;
-    public Pose2D autoPos;
-    Pose2D pos = null;
+    //public Pose2D autoPos;
+    //Pose2D pos = null;
     double oldTime = 0;
     boolean alliance = true;
     public double highVelocity = 1500.0;
@@ -55,7 +55,7 @@ public class LlDrivemode extends LinearOpMode {
 
 
     // HERE //
-    private Limelight3A limelight;
+    //private Limelight3A limelight;
     private IMU imu;
 
     @Override
@@ -85,8 +85,8 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // Limelight initalization HERE!
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        limelight.pipelineSwitch(8);
+        //limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        //limelight.pipelineSwitch(8);
 
 
         // IMU HERE!
@@ -99,15 +99,15 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // Odometry setup
-        odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+        //odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
 
 
         // Type of odometry arm that the robot is using.
-        odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
+        //odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
 
 
         //Direction
-        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+        //odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
 
 
        /*
@@ -117,7 +117,7 @@ public class LlDrivemode extends LinearOpMode {
        resetPosAndIMU will reset the position to 0,0,0 and also recalibrate the IMU.
        This is recommended before you run your autonomous, as a bad initial calibration can cause
        an incorrect starting value for x, y, and heading.
-        */
+
         odo.recalibrateIMU();
         odo.resetPosAndIMU();
         // Measure in milimeters at the meeting, this is not currently accurate.
@@ -130,13 +130,14 @@ public class LlDrivemode extends LinearOpMode {
                 AngleUnit.RADIANS,
                 0
         ));
-        telemetry.addData("Autoposition: ", autoPos);
-        telemetry.addData("Status", "Initialized");
-        telemetry.addData("X offset", odo.getXOffset(DistanceUnit.MM));
-        telemetry.addData("Y offset", odo.getYOffset(DistanceUnit.MM));
-        telemetry.addData("Device Version Number:", odo.getDeviceVersion());
-        telemetry.addData("Heading Scalar", odo.getYawScalar());
-        telemetry.update();
+        */
+        //telemetry.addData("Autoposition: ", autoPos);
+        //telemetry.addData("Status", "Initialized");
+        //telemetry.addData("X offset", odo.getXOffset(DistanceUnit.MM));
+        //telemetry.addData("Y offset", odo.getYOffset(DistanceUnit.MM));
+        //telemetry.addData("Device Version Number:", odo.getDeviceVersion());
+        //telemetry.addData("Heading Scalar", odo.getYawScalar());
+        //telemetry.update();
 
 
         final int CYCLE_MS = 5;
@@ -147,15 +148,15 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // HERE //
-        limelight.start();
+        //limelight.start();
 
 
         while (opModeIsActive()) {
             // HERE //
             YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
-            limelight.updateRobotOrientation(orientation.getYaw(AngleUnit.DEGREES));
+            //limelight.updateRobotOrientation(orientation.getYaw(AngleUnit.DEGREES));
 
-            odo.update();
+            //odo.update();
 
             if (gamepad1.x) {
                 alliance = false;
@@ -171,15 +172,15 @@ public class LlDrivemode extends LinearOpMode {
            /*
            gets the current Position (x & y in mm, and heading in degrees) of the robot, and prints it.
             */
-            pos = odo.getPosition();
-            String data = String.format(Locale.US, "{X: %.3f, Y: %.3f, H: %.3f}", pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM), pos.getHeading(AngleUnit.DEGREES));
-            telemetry.addData("Position", data);
+            //pos = odo.getPosition();
+            //String data = String.format(Locale.US, "{X: %.3f, Y: %.3f, H: %.3f}", pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM), pos.getHeading(AngleUnit.DEGREES));
+            //telemetry.addData("Position", data);
 
            /*
            gets the current Velocity (x & y in mm/sec and heading in degrees/sec) and prints it.
             */
-            String velocity = String.format(Locale.US, "{XVel: %.3f, YVel: %.3f, HVel: %.3f}", odo.getVelX(DistanceUnit.MM), odo.getVelY(DistanceUnit.MM), odo.getHeadingVelocity(UnnormalizedAngleUnit.DEGREES));
-            telemetry.addData("Velocity", velocity);
+            //String velocity = String.format(Locale.US, "{XVel: %.3f, YVel: %.3f, HVel: %.3f}", odo.getVelX(DistanceUnit.MM), odo.getVelY(DistanceUnit.MM), odo.getHeadingVelocity(UnnormalizedAngleUnit.DEGREES));
+            //telemetry.addData("Velocity", velocity);
 
 
             if (gamepad2.dpad_left) { // medium
@@ -217,7 +218,7 @@ public class LlDrivemode extends LinearOpMode {
             // Drive calculations
             double y = -gamepad1.left_stick_y * speedMultiplier;
             double x = gamepad1.left_stick_x * 1.1 * speedMultiplier;
-            double rx = -gamepad1.right_stick_x * speedMultiplier;
+            double rx = gamepad1.right_stick_x * speedMultiplier;
             double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
 
 
@@ -236,8 +237,8 @@ public class LlDrivemode extends LinearOpMode {
 
 
             // Limelight alignment HERE //
-            LLResult llResult = limelight.getLatestResult();
-            boolean isValid = llResult != null && llResult.isValid();
+            //LLResult llResult = limelight.getLatestResult();
+            //boolean isValid = llResult != null && llResult.isValid();
 
             if (gamepad1.y) {
                 if (curTargetVelocity == highVelocity) {
@@ -286,7 +287,7 @@ public class LlDrivemode extends LinearOpMode {
             telemetry.addLine("--------------");
 
 
-            if (isValid) {
+            /*if (isValid) {
                 Pose3D botpose = llResult.getBotpose_MT2();
                 //distance = getDistanceFromTag(llResult.getTy());
                 telemetry.addData("Distance", distance);
@@ -295,7 +296,7 @@ public class LlDrivemode extends LinearOpMode {
             } else {
                 telemetry.addLine("No AprilTag Detected");
             }
-
+            */
 
             /* Press a to turn on auto-aim (limelight)
             if (gamepad1.right_trigger > 0.0 && isValid) {
@@ -346,10 +347,10 @@ public class LlDrivemode extends LinearOpMode {
             }
 
             // General info output for the robot in the console
-            telemetry.addData("Status", odo.getDeviceStatus());
+            //telemetry.addData("Status", odo.getDeviceStatus());
             telemetry.addData("Alliance selected: ", alliance);
-            telemetry.addData("Position on the field measured by inches: ", odo.getPosition());
-            telemetry.addData("Pinpoint Frequency", odo.getFrequency()); //prints/gets the current refresh rate of the Pinpoint
+            // telemetry.addData("Position on the field measured by inches: ", odo.getPosition());
+            // telemetry.addData("Pinpoint Frequency", odo.getFrequency()); //prints/gets the current refresh rate of the Pinpoint
             telemetry.addData("REV Hub Frequency: ", frequency); //prints the control system refresh rate
             telemetry.addData("Launcher target velocity : ", launcher_velocity);
             telemetry.addData("Acc target velocity: ", launcher.getVelocity());
