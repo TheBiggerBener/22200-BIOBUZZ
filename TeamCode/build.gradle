@@ -27,6 +27,20 @@ android {
     }
 }
 
+repositories {
+    // Hosts com.acmerobotics.roadrunner:actions and com.acmerobotics.dashboard:dashboard,
+    // which are not on Maven Central.
+    maven {
+        url = 'https://maven.brott.dev/'
+    }
+}
+
 dependencies {
     implementation project(':FtcRobotController')
+
+    // Road Runner - Action API used to sequence autonomous steps.
+    implementation "com.acmerobotics.roadrunner:ftc:0.1.25"
+    implementation "com.acmerobotics.roadrunner:core:1.0.1"
+    implementation "com.acmerobotics.roadrunner:actions:1.0.1"
+    implementation "com.acmerobotics.dashboard:dashboard:0.5.1"
 }
