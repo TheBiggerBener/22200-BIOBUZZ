@@ -16,6 +16,10 @@ import com.qualcomm.robotcore.hardware.AnalogInput;
 // For limelight
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.limelightvision.LLResult;
+
+import org.firstinspires.ftc.teamcode.auto.TagDistance;
+
+import java.util.Map;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.IMU;
 
@@ -55,8 +59,30 @@ public class LlDrivemode extends LinearOpMode {
 
 
     // HERE //
-    //private Limelight3A limelight;
+    // Enabled for cellDist(). tryGet below means a missing camera leaves this null rather
+    // than killing the OpMode, so teleop still drives if the Limelight is unplugged.
+    private Limelight3A limelight;
     private IMU imu;
+
+    /**
+     * Distance in INCHES to the closest AprilTag in view, or Double.NaN if it cannot answer.
+     * Same math intakeOuttake.cellDist() uses - see TagDistance for what has to be
+     * configured before it returns a real number. NEVER returns 0.0 for "no idea", so
+     * always check Double.isNaN() before using it.
+     */
+    public double cellDist() {
+        return TagDistance.closest(limelight == null ? null : limelight.getLatestResult());
+    }
+
+    /** Inches to one specific tag id, or NaN if that tag is not in view. */
+    public double cellDist(int tagId) {
+        return TagDistance.forTag(limelight == null ? null : limelight.getLatestResult(), tagId);
+    }
+
+    /** Inches to every tag in view, keyed by tag id. */
+    public Map<Integer, Double> allCellDists() {
+        return TagDistance.all(limelight == null ? null : limelight.getLatestResult());
+    }
 
     @Override
     public void runOpMode() {
@@ -85,8 +111,10 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // Limelight initalization HERE!
-        //limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        //limelight.pipelineSwitch(8);
+        limelight = hardwareMap.tryGet(Limelight3A.class, "limelight");
+        if (limelight != null) {
+            limelight.pipelineSwitch(TagDistance.APRILTAG_PIPELINE);
+        }
 
 
         // IMU HERE!
@@ -148,7 +176,9 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // HERE //
-        //limelight.start();
+        if (limelight != null) {
+            limelight.start();
+        }
 
 
         while (opModeIsActive()) {
@@ -284,6 +314,13 @@ public class LlDrivemode extends LinearOpMode {
             telemetry.addData("Tuning P PIDF", P);
             telemetry.addData("Tuning F PIDF", F);
             telemetry.addData("Step Size PIDF", stepSizes[stepIndex]);
+            telemetry.addLine("--------------");
+
+            // AprilTag distance. NaN until the Limelight has 3D enabled with the right tag
+            // size, or CAMERA_HEIGHT_IN / CAMERA_PITCH_DEG are measured in TagDistance.
+            double dist = cellDist();
+            telemetry.addData("cellDist (in)", Double.isNaN(dist) ? "no reading" : String.format("%.1f", dist));
+            telemetry.addData("all tag dists", allCellDists());
             telemetry.addLine("--------------");
 
 

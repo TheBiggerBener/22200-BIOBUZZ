@@ -20,13 +20,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -124,7 +120,7 @@ public class intakeOuttake {
         laserAnalog = track(hardwareMap.tryGet(AnalogInput.class, "laserAnalogInput"), "laserAnalogInput");
 
         if (limelight != null) {
-            limelight.pipelineSwitch(0);
+            limelight.pipelineSwitch(TagDistance.APRILTAG_PIPELINE);
             limelight.start();
         }
 
@@ -303,107 +299,33 @@ public class intakeOuttake {
     }
 
     // =====================================================================================
-    //  cellDist() - how far the robot is from an AprilTag, in INCHES.
+    //  cellDist() - distance to an AprilTag in inches.
     //
-    //  Returns Double.NaN when it cannot answer. ALWAYS check with Double.isNaN() before
-    //  using it; a silent 0.0 would read as "the tag is touching the robot".
+    //  The math lives in TagDistance, so LlDrivemode can use the identical code without
+    //  constructing this whole class (which would re-initialise the IMU and fight over the
+    //  launcher PIDF that teleop sets every loop).
     //
-    //  Two ways to get there, best first:
-    //
-    //  1. SOLVEPNP (accurate). The camera solves the tag's full 3D pose from its four
-    //     corners. Needs the pipeline setting fiducial_skip3d = 0, and fiducial_size (or a
-    //     loaded .fmap) matching the real tag. As of writing this camera has skip3d = 1 and
-    //     fiducial_size = 101.6 mm while the BIOBUZZ field tags 30-37 are 82.5 mm, so this
-    //     path returns nothing yet. Fix both on the Limelight dashboard and it starts working
-    //     with no code change.
-    //
-    //  2. TRIG (fallback). distance = (tagHeight - cameraHeight) / tan(cameraPitch + ty)
-    //     Needs CAMERA_HEIGHT_IN and CAMERA_PITCH_DEG measured on the robot. Less accurate,
-    //     degrades badly when the tag is near the image centre (tan approaches 0), and
-    //     assumes the tag is at TAG_HEIGHT_IN.
-    //
-    //  Both give distance from the CAMERA unless the camera's pose in robot space is set on
-    //  the Limelight dashboard. For launcher RPM you want distance from the LAUNCHER anyway,
-    //  so measure that offset and add it rather than assuming they are the same point.
+    //  Returns Double.NaN whenever it cannot answer - never 0.0. Always check
+    //  Double.isNaN(). See TagDistance for what must be true before it can answer at all.
     // =====================================================================================
 
-    // TODO MEASURE BOTH. While they are 0 the trig fallback refuses to answer rather than
-    // returning a made-up number.
-    public static double CAMERA_HEIGHT_IN = 0.0;  // lens centre above the floor, inches
-    public static double CAMERA_PITCH_DEG = 0.0;  // upward tilt, degrees. 0 = dead level.
-
-    // Tag centre height above the floor. BIOBUZZ.fmap puts tags 30-37 at z = 1.075 m.
-    public static final double TAG_HEIGHT_IN = 1.075 * 39.3701; // 42.32 in
-
-    /** Distance in inches to the closest AprilTag currently visible, or NaN if none. */
+    /** Inches to the closest AprilTag in view, or NaN if none. */
     public double cellDist() {
-        double best = Double.NaN;
-        for (double d : allCellDists().values()) {
-            if (!Double.isNaN(d) && (Double.isNaN(best) || d < best)) best = d;
-        }
-        return best;
+        return TagDistance.closest(latestResult());
     }
 
-    /** Distance in inches to one specific tag id, or NaN if that tag is not in view. */
+    /** Inches to one specific tag id, or NaN if that tag is not in view. */
     public double cellDist(int tagId) {
-        Double d = allCellDists().get(tagId);
-        return d == null ? Double.NaN : d;
+        return TagDistance.forTag(latestResult(), tagId);
     }
 
-    /** Distance in inches to every tag currently in view, keyed by tag id. */
+    /** Inches to every tag in view, keyed by tag id. */
     public Map<Integer, Double> allCellDists() {
-        Map<Integer, Double> out = new LinkedHashMap<>();
-        if (limelight == null) return out;
-
-        LLResult result = limelight.getLatestResult();
-        if (result == null || !result.isValid()) return out;
-
-        List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
-        if (fiducials == null) return out;
-
-        for (LLResultTypes.FiducialResult fid : fiducials) {
-            out.put(fid.getFiducialId(), distanceTo(fid));
-        }
-        return out;
+        return TagDistance.all(latestResult());
     }
 
-    /** One tag: solvePnP if the camera is giving 3D, otherwise trig. NaN if neither works. */
-    private double distanceTo(LLResultTypes.FiducialResult fid) {
-        double fromPose = distanceFromPose(fid);
-        if (!Double.isNaN(fromPose)) return fromPose;
-        return distanceFromAngle(fid);
-    }
-
-    private double distanceFromPose(LLResultTypes.FiducialResult fid) {
-        Pose3D pose = fid.getTargetPoseRobotSpace();
-        if (pose == null || pose.getPosition() == null) return Double.NaN;
-
-        Position p = pose.getPosition().toUnit(DistanceUnit.INCH);
-
-        // With fiducial_skip3d = 1 the camera reports no 3D, which arrives as all zeros.
-        // Treat that as "no answer" instead of "zero inches away".
-        if (p.x == 0.0 && p.y == 0.0 && p.z == 0.0) return Double.NaN;
-
-        // Ground distance - the horizontal run to the tag, ignoring how high it is. This is
-        // the number a launcher lookup table wants. For the straight-line slant distance
-        // instead, use Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z).
-        return Math.hypot(p.x, p.y);
-    }
-
-    private double distanceFromAngle(LLResultTypes.FiducialResult fid) {
-        // Refuse to guess until the camera mounting has actually been measured.
-        if (CAMERA_HEIGHT_IN == 0.0 && CAMERA_PITCH_DEG == 0.0) return Double.NaN;
-
-        // That tag's OWN vertical angle, not result.getTy() which only describes the
-        // primary target and would be a different tag entirely.
-        double angleDeg = CAMERA_PITCH_DEG + fid.getTargetYDegrees();
-        double heightDiff = TAG_HEIGHT_IN - CAMERA_HEIGHT_IN;
-
-        // Looking level or below a tag that is above the camera: tan goes to 0 or negative
-        // and the distance blows up to nonsense. Refuse rather than return garbage.
-        if (angleDeg <= 0.5) return Double.NaN;
-
-        return heightDiff / Math.tan(Math.toRadians(angleDeg));
+    private LLResult latestResult() {
+        return limelight == null ? null : limelight.getLatestResult();
     }
 
     public Action intakeBalls() { return new intakeBalls(); }
