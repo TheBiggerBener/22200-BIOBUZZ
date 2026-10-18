@@ -272,8 +272,23 @@ public class shootTest extends LinearOpMode {
             // General info output for the robot in the console
             //telemetry.addData("Status", odo.getDeviceStatus());
             telemetry.addData("Velocity", launcher_velocity);
-            telemetry.addData("leftStick", gamepad2.left_stick_y);
-            telemetry.addData("left_trigger", gamepad2.left_trigger);
+
+            // Actual RPM the wheel is really spinning at. getVelocity() is in ENCODER TICKS
+            // PER SECOND, not RPM, so convert:  rpm = ticksPerSec / ticksPerRev * 60
+            //
+            // ticksPerRev is read from the motor type selected in the Configure Robot screen
+            // rather than hardcoded, so it stays right if the launcher motor is ever swapped.
+            // If this RPM looks wildly wrong, that config entry is the first thing to check -
+            // a mismatched motor type scales this number by exactly the wrong gear ratio.
+            double ticksPerRev = launcher != null ? launcher.getMotorType().getTicksPerRev() : 0.0;
+            double actualRpm = (launcher != null && ticksPerRev > 0.0)
+                    ? launcher.getVelocity() / ticksPerRev * 60.0
+                    : Double.NaN;
+
+            telemetry.addData("Actual RPM", Double.isNaN(actualRpm)
+                    ? "no reading" : String.format("%.0f rpm", actualRpm));
+            telemetry.addData("ticks/rev", ticksPerRev);
+
             telemetry.addData("Acc Velocity", launcher.getVelocity());
             telemetry.addData("launcher is real", launcher != null);
             telemetry.update();
