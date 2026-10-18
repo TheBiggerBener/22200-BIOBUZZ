@@ -42,7 +42,7 @@ public class LlDrivemode extends LinearOpMode {
     double launcher_velocity = 3000.0;
     GoBildaPinpointDriver odo;
     //public Pose2D autoPos;
-    //Pose2D pos = null;
+    Pose2D pos = null; // filled in from odo.getPosition() when the Pinpoint is present
     double oldTime = 0;
     boolean alliance = true;
     public double highVelocity = 1500.0;
@@ -93,7 +93,10 @@ public class LlDrivemode extends LinearOpMode {
         DcMotorEx frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         DcMotorEx backRight = hardwareMap.get(DcMotorEx.class, "backRight");
         intake = hardwareMap.dcMotor.get("intake");
-        launcher = hardwareMap.get(DcMotorEx.class, "launcherMotor");
+        // NO LAUNCHER ON THE ROBOT RIGHT NOW (Oct 2026). tryGet leaves this null instead
+        // of throwing at init, and every use below is guarded. Bolt the launcher back on,
+        // add it to the robot config, and it works again with nothing to uncomment.
+        launcher = hardwareMap.tryGet(DcMotorEx.class, "launcherMotor");
 
 
         // Motor directions
@@ -106,8 +109,10 @@ public class LlDrivemode extends LinearOpMode {
         frontRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         backRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         intake.setDirection(DcMotor.Direction.FORWARD);
-        launcher.setDirection(DcMotorEx.Direction.FORWARD);
-        launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        if (launcher != null) {
+            launcher.setDirection(DcMotorEx.Direction.FORWARD);
+            launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
 
 
         // Limelight initalization HERE!
@@ -126,39 +131,46 @@ public class LlDrivemode extends LinearOpMode {
         imu.initialize(new IMU.Parameters(orientationOnRobot));
 
 
-        // Odometry setup
-        //odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+        // Odometry setup.
+        // NO ODOMETRY ON THE ROBOT RIGHT NOW (Oct 2026). tryGet leaves odo null instead of
+        // throwing, and every use below is guarded, so this runs fine without the Pinpoint.
+        // Plug the Pinpoint in, configure it as "odo", and all of this wakes up on its own -
+        // nothing to uncomment, nothing to remember.
+        odo = hardwareMap.tryGet(GoBildaPinpointDriver.class, "odo");
 
+        if (odo != null) {
+            // Type of odometry arm that the robot is using.
+            odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
 
-        // Type of odometry arm that the robot is using.
-        //odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
+            // Direction
+            odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED,
+                    GoBildaPinpointDriver.EncoderDirection.REVERSED);
 
+            // Recalibrate the IMU while the robot is stationary. It calibrates itself at
+            // power-on, but doing it again here makes sure the calibration is good - a bad one
+            // gives a wrong starting x, y and heading, which hurts most in autonomous.
+            // resetPosAndIMU also zeroes the position.
+            odo.recalibrateIMU();
+            odo.resetPosAndIMU();
 
-        //Direction
-        //odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+            // TODO measure these in millimetres at the meeting - not accurate yet.
+            // Tuned for 3110-0002-0001 Product Insight #1.
+            odo.setOffsets(-22.1, -136.4, DistanceUnit.MM);
 
+            odo.update();
+            pos = odo.getPosition();
 
-       /*
-       Before running the robot, recalibrate the IMU. This needs to happen when the robot is stationary
-       The IMU will automatically calibrate when first powered on, but recalibrating before running
-       the robot is a good idea to ensure that the calibration is "good".
-       resetPosAndIMU will reset the position to 0,0,0 and also recalibrate the IMU.
-       This is recommended before you run your autonomous, as a bad initial calibration can cause
-       an incorrect starting value for x, y, and heading.
+            // TODO this is LAST SEASON'S starting pose on the DECODE field. It is almost
+            // certainly wrong for BIOBUZZ. Set the real start pose before trusting odometry
+            // for anything field-relative.
+            odo.setPosition(new Pose2D(DistanceUnit.MM,
+                    609.6,
+                    -1828.8,
+                    AngleUnit.RADIANS,
+                    0
+            ));
+        }
 
-        odo.recalibrateIMU();
-        odo.resetPosAndIMU();
-        // Measure in milimeters at the meeting, this is not currently accurate.
-        odo.setOffsets(-22.1, -136.4, DistanceUnit.MM); //these are tuned for 3110-0002-0001 Product Insight #1
-        odo.update();
-        pos = odo.getPosition();
-        odo.setPosition(new Pose2D(DistanceUnit.MM,
-                609.6,
-                -1828.8,
-                AngleUnit.RADIANS,
-                0
-        ));
-        */
         //telemetry.addData("Autoposition: ", autoPos);
         //telemetry.addData("Status", "Initialized");
         //telemetry.addData("X offset", odo.getXOffset(DistanceUnit.MM));
@@ -300,11 +312,14 @@ public class LlDrivemode extends LinearOpMode {
                 P -= stepSizes[stepIndex];
             }
 
-            PIDFCoefficients pidfCoefficients = new PIDFCoefficients(175.0, 0, 0, 12.663387);
-            launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfCoefficients);
+            if (launcher != null) {
+                PIDFCoefficients pidfCoefficients = new PIDFCoefficients(175.0, 0, 0, 12.663387);
+                launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfCoefficients);
+            }
 
-
-            double curVelocity = launcher.getVelocity();
+            // NaN rather than 0.0 while there is no launcher, so the readout says so plainly
+            // instead of looking like a launcher that is spun down.
+            double curVelocity = launcher != null ? launcher.getVelocity() : Double.NaN;
             double error = curTargetVelocity - curVelocity;
 
             telemetry.addData("Target Velocity PIDF", curTargetVelocity);
@@ -390,7 +405,12 @@ public class LlDrivemode extends LinearOpMode {
             // telemetry.addData("Pinpoint Frequency", odo.getFrequency()); //prints/gets the current refresh rate of the Pinpoint
             telemetry.addData("REV Hub Frequency: ", frequency); //prints the control system refresh rate
             telemetry.addData("Launcher target velocity : ", launcher_velocity);
-            telemetry.addData("Acc target velocity: ", launcher.getVelocity());
+            telemetry.addData("Acc target velocity: ",
+                    launcher != null ? launcher.getVelocity() : Double.NaN);
+            telemetry.addData("hardware", "launcher %s | limelight %s | odo %s",
+                    launcher == null ? "ABSENT" : "ok",
+                    limelight == null ? "ABSENT" : "ok",
+                    odo == null ? "ABSENT" : "ok");
             telemetry.update();
             sleep(CYCLE_MS);
             idle();

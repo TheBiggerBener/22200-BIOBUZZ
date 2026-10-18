@@ -67,12 +67,14 @@ public class intakeOuttake {
     // Confirmed present on this robot.
     public final DcMotorEx leftFront, leftBack, rightBack, rightFront;
     public final DcMotor intake;
-    public final DcMotorEx launcher;
     public final IMU imu;
 
-    // Present in this robot's config but commented out in LlDrivemode, so treated as
-    // optional until someone confirms the camera is actually plugged in.
+    // NOT ON THE ROBOT RIGHT NOW (Oct 2026). Both are optional: they come back as null
+    // and every use below is guarded, so nothing here crashes while they are absent. Bolt
+    // the hardware on, add it to the robot config, and they start working again with no
+    // code change - nothing to uncomment, nothing to remember.
     public final Limelight3A limelight;
+    public final DcMotorEx launcher;
 
     // Not in this robot's config at all. null unless somebody adds them.
     public final AnalogInput laserAnalog;
@@ -101,11 +103,14 @@ public class intakeOuttake {
         intake = hardwareMap.get(DcMotor.class, "intake");
         intake.setDirection(DcMotor.Direction.FORWARD);
 
-        launcher = hardwareMap.get(DcMotorEx.class, "launcherMotor");
-        launcher.setDirection(DcMotorEx.Direction.FORWARD);
-        launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
+        // No launcher on the robot at the moment - tryGet so this does not throw.
+        launcher = track(hardwareMap.tryGet(DcMotorEx.class, "launcherMotor"), "launcherMotor");
+        if (launcher != null) {
+            launcher.setDirection(DcMotorEx.Direction.FORWARD);
+            launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
+                    new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
+        }
 
         // --- IMU: orientation copied from LlDrivemode.java:92-96 (UP / FORWARD).
         // Last season's file said RIGHT / UP; that was a different robot. Do not "restore" it.
@@ -151,8 +156,10 @@ public class intakeOuttake {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             intake.setPower(0.0);
-            launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            launcher.setPower(0.0);
+            if (launcher != null) {
+                launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                launcher.setPower(0.0);
+            }
             return false;
         }
     }
@@ -174,6 +181,7 @@ public class intakeOuttake {
 
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
+            if (launcher == null) return false; // no launcher on the robot yet
             launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
                     new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
             launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);

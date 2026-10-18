@@ -1,5 +1,9 @@
 package org.firstinspires.ftc.teamcode.auto;
 
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.RaceAction;
+import com.acmerobotics.roadrunner.SleepAction;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
@@ -36,6 +40,7 @@ public class BIOtest extends OpMode {
     private Follower follower;
     private Timer pathTimer;
     private PathChain driveOut;
+    private Action driveAction;
     private boolean finished = false;
 
     private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
@@ -52,6 +57,15 @@ public class BIOtest extends OpMode {
                 .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                 .build();
 
+        // Drive the path, but race it against a timeout. RaceAction finishes as soon as
+        // ANY of its actions finishes, so whichever happens first - arriving, or 5 seconds
+        // elapsing - ends it. This replaces the hand-written elapsed-time check that used to
+        // live in loop(), and it is the pattern that scales: swap RaceAction for
+        // SequentialAction and this becomes a multi-step auto.
+        driveAction = new RaceAction(
+                new FollowPathAction(follower, driveOut, true),
+                new SleepAction(TIMEOUT_SECONDS));
+
         follower.setPose(startPose);
 
         telemetry.addLine("BIOtest: drives " + DRIVE_INCHES + " in forward, then ends.");
@@ -62,24 +76,27 @@ public class BIOtest extends OpMode {
     @Override
     public void start() {
         pathTimer.resetTimer();
-        follower.followPath(driveOut, true);
+        // No followPath() call here any more - FollowPathAction hands the path over itself
+        // on its first tick, inside loop().
         RobotLog.ii(LOG_TAG, "START driving %.1f in", DRIVE_INCHES);
     }
 
     @Override
     public void loop() {
+        // MUST run every loop. FollowPathAction deliberately does not call this itself, and
+        // without it the follower never moves and isBusy() never clears.
         follower.update();
 
         if (!finished) {
-            boolean arrived = !follower.isBusy();
-            boolean timedOut = pathTimer.getElapsedTimeSeconds() > TIMEOUT_SECONDS;
+            // One tick of the composed action. Returns false once the race is settled -
+            // either the path finished or the SleepAction timeout won.
+            boolean stillRunning = driveAction.run(new TelemetryPacket());
 
-            if (arrived || timedOut) {
+            if (!stillRunning) {
                 // Release the path so Pedro stops driving the motors to hold the end pose.
                 follower.breakFollowing();
                 finished = true;
-                RobotLog.ii(LOG_TAG, "DONE (%s) t=%.2fs x=%.2f y=%.2f heading=%.1fdeg",
-                        timedOut ? "timeout" : "arrived",
+                RobotLog.ii(LOG_TAG, "DONE t=%.2fs x=%.2f y=%.2f heading=%.1fdeg",
                         pathTimer.getElapsedTimeSeconds(),
                         follower.getPose().getX(), follower.getPose().getY(),
                         Math.toDegrees(follower.getPose().getHeading()));
