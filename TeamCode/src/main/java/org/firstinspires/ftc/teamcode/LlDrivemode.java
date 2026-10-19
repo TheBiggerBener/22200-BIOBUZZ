@@ -100,10 +100,12 @@ public class LlDrivemode extends LinearOpMode {
 
 
         // Motor directions
-        frontLeft.setDirection(DcMotorEx.Direction.FORWARD);
-        backLeft.setDirection(DcMotorEx.Direction.FORWARD);
-        frontRight.setDirection(DcMotorEx.Direction.REVERSE);
-        backRight.setDirection(DcMotorEx.Direction.REVERSE);
+        // FIXED: left side is REVERSE and right side is FORWARD so the robot moves the
+        // way the driver pushes the stick. (These were the opposite way around before.)
+        frontLeft.setDirection(DcMotorEx.Direction.REVERSE);
+        backLeft.setDirection(DcMotorEx.Direction.REVERSE);
+        frontRight.setDirection(DcMotorEx.Direction.FORWARD);
+        backRight.setDirection(DcMotorEx.Direction.FORWARD);
         frontLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         backLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         frontRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -259,16 +261,16 @@ public class LlDrivemode extends LinearOpMode {
 
             // Drive calculations
             double y = -gamepad1.left_stick_y * speedMultiplier;
-            double x = gamepad1.left_stick_x * 1.1 * speedMultiplier;
+            double x = -gamepad1.left_stick_x * 1.1 * speedMultiplier; // negated to fix strafe direction
             double rx = gamepad1.right_stick_x * speedMultiplier;
-            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
-
 
             // To decrease 'noise' via small movements
+            // (moved above the denominator so the normalization uses the cleaned-up values)
             if (Math.abs(x) < 0.05) x = 0;
             if (Math.abs(y) < 0.05) y = 0;
             if (Math.abs(rx) < 0.05) rx = 0;
 
+            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
 
             double fL_Motor = (y + x + rx) / denominator;
             double bL_Motor = (y - x + rx) / denominator;
