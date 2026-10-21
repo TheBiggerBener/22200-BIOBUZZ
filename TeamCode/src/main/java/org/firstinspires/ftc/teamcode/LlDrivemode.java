@@ -92,7 +92,7 @@ public class LlDrivemode extends LinearOpMode {
         DcMotorEx backLeft = hardwareMap.get(DcMotorEx.class, "backLeft");
         DcMotorEx frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         DcMotorEx backRight = hardwareMap.get(DcMotorEx.class, "backRight");
-        intake = hardwareMap.dcMotor.get("intake");
+        DcMotorEx intake = hardwareMap.get(DcMotorEx.class, "intake");
         // NO LAUNCHER ON THE ROBOT RIGHT NOW (Oct 2026). tryGet leaves this null instead
         // of throwing at init, and every use below is guarded. Bolt the launcher back on,
         // add it to the robot config, and it works again with nothing to uncomment.
@@ -108,7 +108,7 @@ public class LlDrivemode extends LinearOpMode {
         backLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         frontRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         backRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        intake.setDirection(DcMotor.Direction.FORWARD);
+        intake.setDirection(DcMotorEx.Direction.FORWARD);
         if (launcher != null) {
             launcher.setDirection(DcMotorEx.Direction.FORWARD);
             launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -243,8 +243,8 @@ public class LlDrivemode extends LinearOpMode {
             */
 
             double speedMultiplier = 1.0;
-            if (gamepad1.left_trigger > 0.5) {
-                speedMultiplier *= 0.4; // Original - prev was 0.5
+            if (gamepad1.left_trigger > 0.5 || gamepad1.left_bumper) {
+                if (gamepad1.left_trigger > 0.5) { speedMultiplier *= 0.4; } // Original - prev was 0.5
                 frontLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
                 frontRight.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
                 backLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
@@ -259,16 +259,15 @@ public class LlDrivemode extends LinearOpMode {
 
             // Drive calculations
             double y = -gamepad1.left_stick_y * speedMultiplier;
-            double x = gamepad1.left_stick_x * 1.1 * speedMultiplier;
+            double x = -gamepad1.left_stick_x * 1.1 * speedMultiplier;
             double rx = gamepad1.right_stick_x * speedMultiplier;
-            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
-
 
             // To decrease 'noise' via small movements
             if (Math.abs(x) < 0.05) x = 0;
             if (Math.abs(y) < 0.05) y = 0;
             if (Math.abs(rx) < 0.05) rx = 0;
 
+            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
 
             double fL_Motor = (y + x + rx) / denominator;
             double bL_Motor = (y - x + rx) / denominator;
@@ -381,7 +380,7 @@ public class LlDrivemode extends LinearOpMode {
             backRight.setPower(bR_Motor);
 
             // Intake motor's control
-            if (gamepad2.right_trigger > 0.0) { intake.setPower(gamepad2.right_trigger); } else if (gamepad2.left_trigger > 0.0){ intake.setPower(-gamepad2.left_trigger); } else { intake.setPower(0.0); }
+            if (gamepad2.right_trigger > 0.0) { intake.setVelocity((gamepad2.right_trigger*0.19)*2800.0); } else if (gamepad2.left_trigger > 0.0){ intake.setPower(-(gamepad2.right_trigger*0.19)*2800.0); } else { intake.setPower(0.0); }
 
             /* launcher brake toggler
             if (gamepad2.left_bumper) {
@@ -398,9 +397,15 @@ public class LlDrivemode extends LinearOpMode {
                 launcher_velocity -= 100;
             }
 
+            double ticksPerRev = intake != null ? intake.getMotorType().getTicksPerRev() : 0.0;
+            double actualRpm = (intake != null && ticksPerRev > 0.0)
+                    ? intake.getVelocity() / ticksPerRev * 60.0
+                    : Double.NaN;
             // General info output for the robot in the console
             //telemetry.addData("Status", odo.getDeviceStatus());
             telemetry.addData("Alliance selected: ", alliance);
+            telemetry.addData("intake velocity", intake.getVelocity());
+            telemetry.addData("intake SHOULD be at this rpm", actualRpm);
             // telemetry.addData("Position on the field measured by inches: ", odo.getPosition());
             // telemetry.addData("Pinpoint Frequency", odo.getFrequency()); //prints/gets the current refresh rate of the Pinpoint
             telemetry.addData("REV Hub Frequency: ", frequency); //prints the control system refresh rate
