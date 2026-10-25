@@ -4,11 +4,12 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.RaceAction;
 import com.acmerobotics.roadrunner.SleepAction;
+import static com.pedropathing.api.Paths.line;
+
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierLine;
-import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.PathChain;
-import com.pedropathing.util.Timer;
+import com.pedropathing.math.Pose;
+import com.pedropathing.paths.Path;
+import com.pedropathing.utils.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.util.RobotLog;
@@ -24,7 +25,7 @@ import com.qualcomm.robotcore.util.RobotLog;
  *
  * FIRST RUN WARNING: the tuning numbers in Constants.java are placeholders, not measured
  * values, so this will not stop at exactly 12 inches yet. Run it with plenty of clear
- * space ahead and a hand on stop. Constants.maxPower is 0.5 to keep it slow.
+ * space ahead and a hand on stop. Constants maxPathSpeed is 0.5 to keep it slow.
  */
 @Autonomous(name = "BIOtest - drive 12in", group = "auto")
 public class BIOtest extends OpMode {
@@ -39,7 +40,7 @@ public class BIOtest extends OpMode {
 
     private Follower follower;
     private Timer pathTimer;
-    private PathChain driveOut;
+    private Path driveOut;
     private Action driveAction;
     private boolean finished = false;
 
@@ -52,10 +53,8 @@ public class BIOtest extends OpMode {
         pathTimer = new Timer();
 
         // Straight line, heading held at the starting heading the whole way.
-        driveOut = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, endPose))
-                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
-                .build();
+        driveOut = line(startPose, endPose)
+                .linear(startPose, endPose);
 
         // Drive the path, but race it against a timeout. RaceAction finishes as soon as
         // ANY of its actions finishes, so whichever happens first - arriving, or 5 seconds
@@ -75,8 +74,8 @@ public class BIOtest extends OpMode {
 
     @Override
     public void start() {
-        pathTimer.resetTimer();
-        // No followPath() call here any more - FollowPathAction hands the path over itself
+        pathTimer.reset();
+        // No follow() call here any more - FollowPathAction hands the path over itself
         // on its first tick, inside loop().
         RobotLog.ii(LOG_TAG, "START driving %.1f in", DRIVE_INCHES);
     }
@@ -94,12 +93,12 @@ public class BIOtest extends OpMode {
 
             if (!stillRunning) {
                 // Release the path so Pedro stops driving the motors to hold the end pose.
-                follower.breakFollowing();
+                follower.stop();
                 finished = true;
                 RobotLog.ii(LOG_TAG, "DONE t=%.2fs x=%.2f y=%.2f heading=%.1fdeg",
-                        pathTimer.getElapsedTimeSeconds(),
-                        follower.getPose().getX(), follower.getPose().getY(),
-                        Math.toDegrees(follower.getPose().getHeading()));
+                        pathTimer.seconds(),
+                        follower.pose().x(), follower.pose().y(),
+                        Math.toDegrees(follower.pose().heading()));
             }
         } else {
             // Autonomous is over - end the OpMode instead of idling out the period.
@@ -109,9 +108,9 @@ public class BIOtest extends OpMode {
         telemetry.addData("state", finished ? "DONE" : "DRIVING");
         telemetry.addData("target", "%.1f in forward", DRIVE_INCHES);
         telemetry.addData("x / y", "%.2f / %.2f in",
-                follower.getPose().getX(), follower.getPose().getY());
-        telemetry.addData("heading", "%.1f deg", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("t", "%.2f s", pathTimer.getElapsedTimeSeconds());
+                follower.pose().x(), follower.pose().y());
+        telemetry.addData("heading", "%.1f deg", Math.toDegrees(follower.pose().heading()));
+        telemetry.addData("t", "%.2f s", pathTimer.seconds());
         telemetry.update();
     }
 }

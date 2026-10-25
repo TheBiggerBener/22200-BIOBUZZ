@@ -5,7 +5,7 @@ import androidx.annotation.NonNull;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.paths.PathChain;
+import com.pedropathing.paths.Path;
 
 /**
  * Wraps a Pedro Pathing path as a Road Runner Action, so driving somewhere can be composed
@@ -39,26 +39,27 @@ import com.pedropathing.paths.PathChain;
 public class FollowPathAction implements Action {
 
     private final Follower follower;
-    private final PathChain path;
+    private final Path path;
     private final boolean holdEnd;
 
     private boolean started = false;
 
     /** holdEnd true keeps Pedro actively holding the final pose once it arrives. */
-    public FollowPathAction(Follower follower, PathChain path, boolean holdEnd) {
+    public FollowPathAction(Follower follower, Path path, boolean holdEnd) {
         this.follower = follower;
         this.path = path;
         this.holdEnd = holdEnd;
     }
 
-    public FollowPathAction(Follower follower, PathChain path) {
+    public FollowPathAction(Follower follower, Path path) {
         this(follower, path, true);
     }
 
     @Override
     public boolean run(@NonNull TelemetryPacket packet) {
         if (!started) {
-            follower.followPath(path, holdEnd);
+            follower.holdEnd.set(holdEnd);
+            follower.follow(path);
             started = true;
 
             // Claim "still working" for this tick no matter what. isBusy() can still read
