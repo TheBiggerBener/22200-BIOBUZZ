@@ -53,6 +53,8 @@ public class LlDrivemode extends LinearOpMode {
     double[] stepSizes = {10.0, 1.0, 0.1, 0.001, 0.0001};
     int stepIndex = 1;
     private DcMotor intake;
+    private Servo garden1;
+    private Servo garden2;
     private DcMotorEx launcher;
     Servo rgbLight; // For color
     private double distance;
@@ -93,6 +95,8 @@ public class LlDrivemode extends LinearOpMode {
         DcMotorEx frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         DcMotorEx backRight = hardwareMap.get(DcMotorEx.class, "backRight");
         DcMotorEx intake = hardwareMap.get(DcMotorEx.class, "intake");
+        Servo garden1 = hardwareMap.tryGet(Servo.class, "garden");
+        Servo garden2 = hardwareMap.tryGet(Servo.class, "garden2");
         // NO LAUNCHER ON THE ROBOT RIGHT NOW (Oct 2026). tryGet leaves this null instead
         // of throwing at init, and every use below is guarded. Bolt the launcher back on,
         // add it to the robot config, and it works again with nothing to uncomment.
@@ -108,7 +112,7 @@ public class LlDrivemode extends LinearOpMode {
         backLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         frontRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         backRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        intake.setDirection(DcMotorEx.Direction.FORWARD);
+        intake.setDirection(DcMotor.Direction.FORWARD);
         if (launcher != null) {
             launcher.setDirection(DcMotorEx.Direction.FORWARD);
             launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -380,7 +384,7 @@ public class LlDrivemode extends LinearOpMode {
             backRight.setPower(bR_Motor);
 
             // Intake motor's control
-            if (gamepad2.right_trigger > 0.0) { intake.setVelocity((gamepad2.right_trigger*0.19)*2800.0); } else if (gamepad2.left_trigger > 0.0){ intake.setPower(-(gamepad2.right_trigger*0.19)*2800.0); } else { intake.setPower(0.0); }
+            if (gamepad2.right_trigger > 0.0) { intake.setPower(gamepad2.right_trigger); } else if (gamepad2.left_trigger > 0.0){ intake.setPower(-gamepad2.left_trigger); } else { intake.setPower(0.0); }
 
             /* launcher brake toggler
             if (gamepad2.left_bumper) {
@@ -395,6 +399,13 @@ public class LlDrivemode extends LinearOpMode {
                 launcher_velocity += 100;
             } else if (gamepad2.left_stick_y < 0.0) {
                 launcher_velocity -= 100;
+            }
+            if (gamepad2.xWasPressed() && garden1.getPosition() == 1.0) {
+                garden1.setPosition(0.4);
+                garden2.setPosition(0.4);
+            } else if (gamepad2.xWasPressed() && garden1.getPosition() == 0.4) {
+                garden1.setPosition(1.0);
+                garden2.setPosition(1.0);
             }
 
             double ticksPerRev = intake != null ? intake.getMotorType().getTicksPerRev() : 0.0;
