@@ -8,14 +8,12 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import com.qualcomm.robotcore.hardware.AnalogInput;
-import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
@@ -30,23 +28,33 @@ import java.util.Map;
  * Mechanism + AprilTag helper, ported from last season's DECODE code so the autonomous
  * side can drive the non-drivetrain hardware and align to tags through Road Runner Actions.
  *
- * ================= WHY THIS DOES NOT CRASH ON A HALF-BUILT ROBOT =================
- * Last season's robot had more hardware than this one is configured for. Checked against
- * LlDrivemode.java, this robot's config knows about:
+ * ===================== THE HARDWARE THIS CLASS EXPECTS ===========================
+ * Exactly the devices LlDrivemode.java configures, by the same config names, so teleop and
+ * autonomous can never disagree about what is on the robot:
  *
- *     frontLeft  backLeft  frontRight  backRight  imu  intake  launcherMotor  odo  limelight
+ *   REQUIRED  frontLeft  backLeft  frontRight  backRight   (drivetrain, DcMotorEx)
+ *             intake                                        (DcMotorEx)
+ *             imu
  *
- * Last season's version also wanted leftFeeder, rightFeeder, topWheel, boxMotor and
- * laserAnalogInput. Those are NOT in this robot's config. Asking hardwareMap.get() for a
- * device that is not configured throws, which would make every OpMode using this class die
- * at init. So the devices this robot is known to have are fetched normally, and the rest go
- * through hardwareMap.tryGet(), which returns null instead of throwing.
+ *   OPTIONAL  garden  garden2                               (Servo)
+ *             launcherMotor                                 (DcMotorEx)
+ *             limelight                                     (Limelight3A)
  *
- * Every action below checks for null before touching optional hardware, so a missing feeder
- * means "that part does nothing", not "the OpMode crashed". Call missingDevices() and put it
- * on telemetry so it is obvious which pieces are not responding rather than silently absent.
+ * Required devices use hardwareMap.get(), which throws at init if the config is missing one -
+ * that is deliberate, because an auto cannot drive without a drivetrain and you want to know
+ * at init, not halfway down a path. Optional devices use hardwareMap.tryGet(), which returns
+ * null instead of throwing, and every use below is null-guarded. A missing launcher means
+ * "that part does nothing", not "the OpMode crashed". Call missingDevices() and put it on
+ * telemetry so it is obvious which pieces are absent.
  *
- * Also note: last year's intakeMotor is called "intake" on this robot. That rename is done.
+ * Last season's leftFeeder, rightFeeder, topWheel, boxMotor and laserAnalogInput are GONE
+ * from this class - none of them is on this robot or in its config, so they could not be
+ * used from an autonomous anyway.
+ *
+ * The goBILDA Pinpoint ("odo") is deliberately NOT fetched here even though LlDrivemode has
+ * it. In autonomous, Pedro's PinpointLocalizer owns that device - see Constants.java. Two
+ * objects talking to the same I2C device fight over it, so autonomous reads the robot's pose
+ * from follower.pose() instead.
  * =================================================================================
  */
 public class intakeOuttake {
@@ -60,59 +68,55 @@ public class intakeOuttake {
     public static final int BLUE_TARGET_TAG = 30;
     public static final int RED_TARGET_TAG = 34;
 
+    // Intake power used by intakeBalls() and shootBalls(). ONE place to change it - the
+    // intake has been overheating, and if you lower it, lower it here.
+
     // TODO these are last season's launcher gains, for last season's launcher. Re-tune.
     private static final double LAUNCHER_P = 430.0;
     private static final double LAUNCHER_F = 14.8;
 
-    // Confirmed present on this robot.
-    public final DcMotorEx leftFront, leftBack, rightBack, rightFront;
-    public final DcMotor intake;
+    // --- required: the OpMode will not start without these ---
+    public final DcMotorEx frontLeft, backLeft, frontRight, backRight;
+    public final DcMotorEx intake;
     public final IMU imu;
 
-    // NOT ON THE ROBOT RIGHT NOW (Oct 2026). Both are optional: they come back as null
-    // and every use below is guarded, so nothing here crashes while they are absent. Bolt
-    // the hardware on, add it to the robot config, and they start working again with no
-    // code change - nothing to uncomment, nothing to remember.
+    // --- optional: null when not in the robot config, every use below is guarded ---
+    // The garden servos. Present in LlDrivemode as "garden" and "garden2".
+    public final Servo garden1, garden2;
+
+    // NOT ON THE ROBOT RIGHT NOW (Oct 2026). Bolt the hardware on, add it to the robot
+    // config, and these start working again with no code change - nothing to uncomment.
     public final Limelight3A limelight;
     public final DcMotorEx launcher;
-
-    // Not in this robot's config at all. null unless somebody adds them.
-    public final AnalogInput laserAnalog;
 
     private final List<String> missing = new ArrayList<>();
     private final ElapsedTime turningTime = new ElapsedTime();
 
     public intakeOuttake(HardwareMap hardwareMap) {
         // --- drivetrain: names and directions match LlDrivemode.java ---
-        leftFront = hardwareMap.get(DcMotorEx.class, "frontLeft");
-        leftBack = hardwareMap.get(DcMotorEx.class, "backLeft");
-        rightFront = hardwareMap.get(DcMotorEx.class, "frontRight");
-        rightBack = hardwareMap.get(DcMotorEx.class, "backRight");
+        // NOTE these assign the FIELDS. Writing "DcMotorEx frontLeft = hardwareMap.get(...)"
+        // here declares a local that shadows the field and leaves the field null, which is
+        // how this class ended up not compiling before.
+        frontLeft = hardwareMap.get(DcMotorEx.class, "frontLeft");
+        backLeft = hardwareMap.get(DcMotorEx.class, "backLeft");
+        frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
+        backRight = hardwareMap.get(DcMotorEx.class, "backRight");
+        intake = hardwareMap.get(DcMotorEx.class, "intake");
 
-        leftFront.setDirection(DcMotorSimple.Direction.FORWARD);
-        leftBack.setDirection(DcMotorSimple.Direction.FORWARD);
-        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
-        rightBack.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontLeft.setDirection(DcMotorEx.Direction.FORWARD);
+        backLeft.setDirection(DcMotorEx.Direction.FORWARD);
+        frontRight.setDirection(DcMotorEx.Direction.REVERSE);
+        backRight.setDirection(DcMotorEx.Direction.REVERSE);
+        frontLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        backLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        frontRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        backRight.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        intake.setDirection(DcMotorEx.Direction.FORWARD);
+        intake.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        intake.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
 
-        // --- mechanisms this robot has ---
-        intake = hardwareMap.get(DcMotor.class, "intake");
-        intake.setDirection(DcMotor.Direction.FORWARD);
-
-        // No launcher on the robot at the moment - tryGet so this does not throw.
-        launcher = track(hardwareMap.tryGet(DcMotorEx.class, "launcherMotor"), "launcherMotor");
-        if (launcher != null) {
-            launcher.setDirection(DcMotorEx.Direction.FORWARD);
-            launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                    new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
-        }
-
-        // --- IMU: orientation copied from LlDrivemode.java:92-96 (UP / FORWARD).
+        // --- IMU: orientation copied from LlDrivemode.java (UP / FORWARD).
         // Last season's file said RIGHT / UP; that was a different robot. Do not "restore" it.
         imu = hardwareMap.get(IMU.class, "imu");
         imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
@@ -121,8 +125,15 @@ public class intakeOuttake {
         )));
 
         // --- optional hardware: null rather than an exception if not configured ---
+        garden1 = track(hardwareMap.tryGet(Servo.class, "garden"), "garden");
+        garden2 = track(hardwareMap.tryGet(Servo.class, "garden2"), "garden2");
+        launcher = track(hardwareMap.tryGet(DcMotorEx.class, "launcherMotor"), "launcherMotor");
         limelight = track(hardwareMap.tryGet(Limelight3A.class, "limelight"), "limelight");
-        laserAnalog = track(hardwareMap.tryGet(AnalogInput.class, "laserAnalogInput"), "laserAnalogInput");
+
+        if (launcher != null) {
+            launcher.setDirection(DcMotorEx.Direction.FORWARD);
+            launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
 
         if (limelight != null) {
             limelight.pipelineSwitch(TagDistance.APRILTAG_PIPELINE);
@@ -147,7 +158,7 @@ public class intakeOuttake {
     public class intakeBalls implements Action {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
-            intake.setPower(1.0);
+            intakeBalls();   // the immediate method below - one implementation, not two
             return false;
         }
     }
@@ -155,11 +166,7 @@ public class intakeOuttake {
     public class stopBalls implements Action {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
-            intake.setPower(0.0);
-            if (launcher != null) {
-                launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-                launcher.setPower(0.0);
-            }
+            stopBalls();
             return false;
         }
     }
@@ -167,7 +174,7 @@ public class intakeOuttake {
     public class shootBalls implements Action {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
-            intake.setPower(1.0);
+            shootBalls();
             return false;
         }
     }
@@ -181,11 +188,7 @@ public class intakeOuttake {
 
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
-            if (launcher == null) return false; // no launcher on the robot yet
-            launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
-                    new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
-            launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-            launcher.setVelocity(velocity);
+            revLauncher(velocity);
             return false;
         }
     }
@@ -275,10 +278,10 @@ public class intakeOuttake {
 
                 double turnPower = Math.max(-MAX_TURN_POWER,
                         Math.min(MAX_TURN_POWER, kP * error));
-                leftFront.setPower(-turnPower);
-                leftBack.setPower(-turnPower);
-                rightFront.setPower(turnPower);
-                rightBack.setPower(turnPower);
+                frontLeft.setPower(-turnPower);
+                backLeft.setPower(-turnPower);
+                frontRight.setPower(turnPower);
+                backRight.setPower(turnPower);
                 return true;
             }
 
@@ -291,18 +294,18 @@ public class intakeOuttake {
 
             // Lost it mid-align: keep sweeping the way it was last correcting toward.
             double sweepPower = (!Double.isNaN(lastTx) && lastTx < 0) ? -SEARCH_POWER : SEARCH_POWER;
-            leftFront.setPower(-sweepPower);
-            leftBack.setPower(-sweepPower);
-            rightFront.setPower(sweepPower);
-            rightBack.setPower(sweepPower);
+            frontLeft.setPower(-sweepPower);
+            backLeft.setPower(-sweepPower);
+            frontRight.setPower(sweepPower);
+            backRight.setPower(sweepPower);
             return true;
         }
 
         private void stopDrive() {
-            leftFront.setPower(0.0);
-            leftBack.setPower(0.0);
-            rightFront.setPower(0.0);
-            rightBack.setPower(0.0);
+            frontLeft.setPower(0.0);
+            backLeft.setPower(0.0);
+            frontRight.setPower(0.0);
+            backRight.setPower(0.0);
         }
     }
 
@@ -336,9 +339,154 @@ public class intakeOuttake {
         return limelight == null ? null : limelight.getLatestResult();
     }
 
-    public Action intakeBalls() { return new intakeBalls(); }
-    public Action stopBalls() { return new stopBalls(); }
-    public Action shootBalls() { return new shootBalls(); }
-    public Action revLauncher(double velocity) { return new revLauncher(velocity); }
-    public Action turnToTag(boolean turn, boolean blue) { return new turnToTag(turn, blue); }
+    /**
+     * Move both garden servos to a position. Does nothing if the servos are not configured.
+     *
+     * The two positions LlDrivemode toggles between are 1.0 and 0.4 (gamepad2 X). Which one
+     * is "open" is not written down anywhere, so they are named by value rather than by a
+     * guess at their meaning - check on the robot and rename them once you know.
+     */
+    public class setGarden implements Action {
+        private final double position;
+
+        public setGarden(double position) {
+            this.position = position;
+        }
+
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+            setGarden(position);
+            return false;
+        }
+    }
+
+    /** The two garden servo positions LlDrivemode toggles between. */
+    public static final double GARDEN_POSITION_ONE = 1.0;
+    public static final double GARDEN_POSITION_FOUR_TENTHS = 0.4;
+
+    // =====================================================================================
+    //  THE MECHANISM METHODS - these DO the thing the moment you call them.
+    //
+    //  Call take.intakeBalls() and the intake turns on. No Action to run, no loop to tick,
+    //  nothing to remember. This is what an iterative OpMode (gardenSide, pathTest,
+    //  shootAutoTest, blueAuto) should use.
+    //
+    //  Every one of them is null-safe: no launcher configured means revLauncher() quietly
+    //  does nothing instead of throwing.
+    // =====================================================================================
+
+    /** Intake on, pulling balls in. */
+    public void intakeBalls() {
+        intake.setPower(1.0);
+    }
+
+    /** Intake off, and the launcher braked to a stop if there is one. */
+    public void stopBalls() {
+        intake.setPower(0.0);
+        if (launcher != null) {
+            launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            launcher.setPower(0.0);
+        }
+    }
+
+    /** Intake on - it is the feed that pushes the next ball into the launcher wheel. */
+    public void shootBalls() {
+        intake.setPower(1.0);
+    }
+
+    /** Spin the launcher up to a velocity in TICKS PER SECOND. No-op without a launcher. */
+    public void revLauncher(double velocity) {
+        if (launcher == null) return; // no launcher on the robot yet
+        launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(LAUNCHER_P, 0.0, 0.0, LAUNCHER_F));
+        launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        launcher.setVelocity(velocity);
+    }
+
+    /** Move both garden servos. No-op for whichever of them is not configured. */
+    public void setGarden(double position) {
+        if (garden1 != null) garden1.setPosition(position);
+        if (garden2 != null) garden2.setPosition(position);
+    }
+
+    // =====================================================================================
+    //  THE ACTION WRAPPERS - for Road Runner sequences only.
+    //
+    //  An Action does NOT run when you build it. Actions.runBlocking(...) or a SequentialAction
+    //  runs it. Writing "take.intakeBallsAction();" on its own line builds an object and
+    //  throws it away - the intake never moves, and the compiler will not warn you.
+    //
+    //  That is why these all end in "Action": if you see that word and no runner, it is a
+    //  bug. If you just want the mechanism to move now, call the method above instead.
+    // =====================================================================================
+
+    public Action intakeBallsAction() { return new intakeBalls(); }
+    public Action stopBallsAction() { return new stopBalls(); }
+    public Action shootBallsAction() { return new shootBalls(); }
+    public Action revLauncherAction(double velocity) { return new revLauncher(velocity); }
+    public Action setGardenAction(double position) { return new setGarden(position); }
+
+    /**
+     * Search for the alliance tag and rotate onto it. This one is genuinely multi-tick -
+     * there is no instant version, because aiming takes time. Drive it with startAction()
+     * and updateAction() below, or put it in a Road Runner sequence.
+     */
+    public Action turnToTagAction(boolean turn, boolean blue) { return new turnToTag(turn, blue); }
+
+    // =====================================================================================
+    //  RUNNING AN ACTION FROM AN ITERATIVE OpMode
+    //
+    //  OpMode (as opposed to LinearOpMode) cannot block, so Actions.runBlocking() is not an
+    //  option. Instead: startAction(...) once, then updateAction() every loop until it
+    //  returns false. That is what Road Runner's runBlocking does internally, just spread
+    //  across loop() calls so the Driver Station stop button still works.
+    //
+    //      // once
+    //      take.startAction(take.turnToTagAction(true, true));
+    //
+    //      // every loop()
+    //      if (take.updateAction()) return;   // still aiming, do nothing else yet
+    // =====================================================================================
+
+    private Action currentAction = null;
+
+    /** Hand over an Action to be ticked by updateAction(). Replaces any current one. */
+    public void startAction(Action action) {
+        currentAction = action;
+    }
+
+    /** Tick the current Action once. Returns true while it still needs more loops. */
+    public boolean updateAction() {
+        if (currentAction == null) return false;
+
+        boolean wantsMoreTime = currentAction.run(new TelemetryPacket());
+        if (!wantsMoreTime) currentAction = null;
+        return wantsMoreTime;
+    }
+
+    public boolean isActionRunning() {
+        return currentAction != null;
+    }
+
+    /** Drop the current Action without finishing it. */
+    public void cancelAction() {
+        currentAction = null;
+    }
+
+    /**
+     * Run a one-shot Action right now, in this call. Safe for the wrappers above, which all
+     * finish in a single tick. If the Action asks for more time this logs a warning and does
+     * NOT loop - a blocking loop inside an OpMode would freeze the robot and ignore the stop
+     * button. Use startAction()/updateAction() for anything multi-tick.
+     */
+    public void runOnce(Action action) {
+        if (action == null) return;
+
+        if (action.run(new TelemetryPacket())) {
+            RobotLog.ww("intakeOuttake",
+                    "runOnce(): %s wanted more than one tick and was cut short - "
+                            + "use startAction()/updateAction() instead",
+                    action.getClass().getSimpleName());
+        }
+    }
 }

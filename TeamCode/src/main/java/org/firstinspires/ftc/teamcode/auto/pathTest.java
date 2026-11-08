@@ -47,14 +47,14 @@ public class pathTest extends OpMode {
 
     // ============================ SET YOUR POSES HERE ===============================
     // Where the robot is physically placed before you press start.
-    private final Pose startPose = new Pose(82.2, 136, Math.toRadians(0));
+    private final Pose startPose = new Pose(82.2, 135.0, Math.toRadians(0));
 
     // The eight waypoints, in the order the robot should visit them.
     // Pose(x, y, heading) - x and y in INCHES, heading via Math.toRadians(degrees).
     // These describe the CENTRE of the robot, not its bumper.
     private final Pose[] WAYPOINTS = new Pose[] {
-            new Pose(118.0, 136.0, Math.toRadians(0)), // path 1
-            new Pose(132.0, 136.0, Math.toRadians(0)), // path 2
+            new Pose(118.0, 135.0, Math.toRadians(0)), // path 1
+            new Pose(132.0, 135.0, Math.toRadians(0)), // path 2
             new Pose(106.46, 105.68, Math.toRadians(90)), // path 3
             new Pose(106.46, 16.06, Math.toRadians(90)), // path 4
             new Pose(83.26,  16.09, Math.toRadians(-90)), // path 5

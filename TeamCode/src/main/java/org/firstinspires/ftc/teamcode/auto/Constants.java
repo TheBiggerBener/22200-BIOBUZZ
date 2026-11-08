@@ -67,8 +67,8 @@ public class Constants {
         c.name.set("odo");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
         c.offsetUnits.set(DistanceUnit.MM);
-        c.xPodOffset.set(-22.1);   // was strafePodX
-        c.yPodOffset.set(-136.4);  // was forwardPodY
+        c.xPodOffset.set(-40.213);
+        c.yPodOffset.set(-109.378);
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);  // was forwardEncoderDirection
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);  // was strafeEncoderDirection
     });
