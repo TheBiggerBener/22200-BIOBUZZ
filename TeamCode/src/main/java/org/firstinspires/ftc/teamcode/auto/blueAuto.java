@@ -24,7 +24,6 @@ public class blueAuto extends OpMode {
         MOVESHOOT,
         SHOOT1,
         GETFLOWER,
-        FLOWERSHOOT,
         SHOOT2,
         PARK,
         COMPLETED,
@@ -39,11 +38,10 @@ public class blueAuto extends OpMode {
     private final Pose point1 = poseFactory.of(132, 136, -90);
     private final Pose point2Start = poseFactory.of(132, 136, -90);
     private final Pose point2 = poseFactory.of(105.8529, 22.8494, -90);
-    private final Pose point3 = poseFactory.of(84.0974, 22.0254, -177.8309);
-    private final Pose point4 = poseFactory.of(90.2629, 7.2601, -155);
-    private final Pose point5 = poseFactory.of(84.1197, 21.6301, 113.1469);
-    private final Pose point6 = poseFactory.of(128.9235, 23.246, -177.9344);
-    private Path Path1, Path2, Path3, Path4, Path5, Path6;
+    private final Pose point3 = poseFactory.of(94.43, 22.48, -177.8309);
+    private final Pose point4 = poseFactory.of(94.43, 8.05, -155);
+    private final Pose point5 = poseFactory.of(128.9235, 23.246, -177.9344);
+    private Path Path1, Path2, Path3, Path4, Path5;
 
 
     public void buildPaths() {
@@ -51,8 +49,7 @@ public class blueAuto extends OpMode {
         Path2 = Paths.line(point2Start, point2).linear(point2Start, point2);
         Path3 = Paths.line(point2, point3).tangent();
         Path4 = Paths.line(point3, point4).constant(point4);
-        Path5 = Paths.line(point4, point5).tangent();
-        Path6 = Paths.line(point5, point6).reverseTangent();
+        Path5 = Paths.line(point4, point5).reverseTangent();
     }
 
     public void statePathUpdate() {
@@ -109,18 +106,10 @@ public class blueAuto extends OpMode {
 
                     if (pathTimer.seconds() > 0.25) {
                         follower.follow(Path4);
-                        setPathState(PathState.FLOWERSHOOT);
+                        setPathState(PathState.SHOOT2);
                     }
                 }
                 break;
-            case FLOWERSHOOT:
-                // Grab second set of 3 artifacts
-                if (!follower.isBusy() && pathTimer.seconds() > 0.3) {
-                    follower.follow(Path5);
-                    setPathState(PathState.SHOOT2);
-                }
-                break;
-
             case SHOOT2:
                 if (!follower.isBusy()) {
                     //take.launcher.setVelocity(1580.0);
@@ -136,7 +125,7 @@ public class blueAuto extends OpMode {
                 break;
             case PARK:
                 if (!follower.isBusy() && pathTimer.seconds() > 0.5) {
-                    follower.follow(Path6);
+                    follower.follow(Path5);
                     setPathState(PathState.COMPLETED);
                 }
                 break;
