@@ -1,6 +1,13 @@
+/*
+THIS FILE IS FOR SHOOTING PRELOAD, GRABBING GARDEN,
+SHOOTING GARDEN ON OPPOSITE SIDE, AND THEN PICKING AND SHOOTING
+FLOWER. THEN PARKING.
+ */
+
 package org.firstinspires.ftc.teamcode.auto;
 
 import static com.pedropathing.api.Paths.line;
+import com.pedropathing.api.PoseFactory;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
@@ -11,10 +18,12 @@ import com.qualcomm.robotcore.util.RobotLog;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import java.util.ArrayList;
 import java.util.List;
+
 @Autonomous
 public class redBioBuzzGarden extends OpMode {
     private ElapsedTime pathTimer, opModeTimer; // 2. Change timer type to ElapsedTime
     private Follower follower;
+    private final PoseFactory poseFactory = PoseFactory.degrees();
     private intakeOuttake take;
     private Path Path1, Path2, Path3, Path4;
 
@@ -32,16 +41,19 @@ public class redBioBuzzGarden extends OpMode {
 
     private PathState pathState;
 
-    private final Pose startPose = new Pose(56.0, 8.0, Math.toRadians(180));
-    private final Pose toGarden = new Pose(9, 8, Math.toRadians(180));
-    private final Pose travelPose = new Pose(41.51, 123.36, Math.toRadians(90));
-    private final Pose pickFlower = new Pose(46.65, 130.25, Math.toRadians(90));
-    private final Pose park = new Pose(10.79, 113.7, Math.toRadians(90));
+    private final Pose start = poseFactory.of(56, 8, 180);
+    private final Pose point1 = poseFactory.of(9, 8, 180);
+    private final Pose point2Start = poseFactory.of(9, 8, 75);
+    private final Pose point2 = poseFactory.of(41.5113, 123.3625, 75);
+    private final Pose point3Start = poseFactory.of(41.5113, 123.3625, 90);
+    private final Pose point3 = poseFactory.of(46.6524, 130.2456, 90);
+    private final Pose point4Start = poseFactory.of(46.6524, 130.2456, 90);
+    private final Pose point4 = poseFactory.of(10.7919, 113.6986, 90);
     public void buildPaths() {
-        Path1 = line(startPose, toGarden).linear(startPose, toGarden);
-        Path2 = line(toGarden, travelPose).linear(toGarden, travelPose);
-        Path3 = line(travelPose, pickFlower).linear(travelPose, pickFlower);
-        Path4 = line(pickFlower, park).linear(pickFlower, park);
+        Path1 = line(start, point1).linear(start, point1);
+        Path2 = line(point2Start, point2).linear(point2Start, point2);
+        Path3 = line(point3Start, point3).linear(point3Start, point3);
+        Path4 = line(point4Start, point4).linear(point4Start, point4);
     }
 
     public void statePathUpdate() {
@@ -146,8 +158,9 @@ public class redBioBuzzGarden extends OpMode {
         // take = new intakeOuttake(hardwareMap);
 
         buildPaths();
-        follower.setPose(startPose);
+        follower.setPose(start);
     }
+
     public void runOpMode() {
         opModeTimer.reset();
         setPathState(pathState);
