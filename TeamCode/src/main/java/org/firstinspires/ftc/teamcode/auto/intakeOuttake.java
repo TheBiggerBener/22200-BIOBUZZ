@@ -78,6 +78,7 @@ public class intakeOuttake {
     // --- required: the OpMode will not start without these ---
     public final DcMotorEx frontLeft, backLeft, frontRight, backRight;
     public final DcMotorEx intake;
+    public final DcMotorEx intake2;
     public final IMU imu;
 
     // --- optional: null when not in the robot config, every use below is guarded ---
@@ -102,6 +103,7 @@ public class intakeOuttake {
         frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         backRight = hardwareMap.get(DcMotorEx.class, "backRight");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
+        intake2 = hardwareMap.get(DcMotorEx.class, "intake2");
 
         frontLeft.setDirection(DcMotorEx.Direction.FORWARD);
         backLeft.setDirection(DcMotorEx.Direction.FORWARD);
@@ -378,11 +380,13 @@ public class intakeOuttake {
     /** Intake on, pulling balls in. */
     public void intakeBalls() {
         intake.setPower(1.0);
+        intake2.setPower(1.0);
     }
 
     /** Intake off, and the launcher braked to a stop if there is one. */
     public void stopBalls() {
         intake.setPower(0.0);
+        intake2.setPower(0.0);
         if (launcher != null) {
             launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             launcher.setPower(0.0);
@@ -391,7 +395,7 @@ public class intakeOuttake {
 
     /** Intake on - it is the feed that pushes the next ball into the launcher wheel. */
     public void shootBalls() {
-        intake.setPower(1.0);
+        intake.setPower(1.0); intake2.setPower(1.0);
     }
 
     /** Spin the launcher up to a velocity in TICKS PER SECOND. No-op without a launcher. */
