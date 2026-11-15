@@ -3,15 +3,14 @@ package org.firstinspires.ftc.teamcode.auto;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.pedropathing.utils.Timer;
 import com.pedropathing.api.Paths;
 import com.pedropathing.api.PoseFactory;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
-@Autonomous(name = "blueAuto", group = "auto")
-public class blueAuto extends OpMode {
+@Autonomous(name = "blueGarden", group = "auto")
+public class blueGarden extends OpMode {
     private ElapsedTime pathTimer, opModeTimer;
     private Follower follower;
     private intakeOuttake take;
@@ -30,7 +29,6 @@ public class blueAuto extends OpMode {
     }// state machine to keep track of diff paths
 
     private PathState pathState;
-    private final Pose startPose = new Pose(82.2, 136, Math.toRadians(90));
 
     private final PoseFactory poseFactory = PoseFactory.degrees();
 

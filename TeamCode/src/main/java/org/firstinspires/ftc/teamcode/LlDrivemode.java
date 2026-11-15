@@ -53,6 +53,7 @@ public class LlDrivemode extends LinearOpMode {
     double[] stepSizes = {10.0, 1.0, 0.1, 0.001, 0.0001};
     int stepIndex = 1;
     private DcMotorEx intake;
+    private DcMotorEx intake2;
     private Servo garden1;
     private Servo garden2;
     private DcMotorEx launcher;
@@ -95,6 +96,7 @@ public class LlDrivemode extends LinearOpMode {
         DcMotorEx frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         DcMotorEx backRight = hardwareMap.get(DcMotorEx.class, "backRight");
         DcMotorEx intake = hardwareMap.get(DcMotorEx.class, "intake");
+        DcMotorEx intake2 = hardwareMap.get(DcMotorEx.class, "intake2");
         Servo garden1 = hardwareMap.tryGet(Servo.class, "garden");
         Servo garden2 = hardwareMap.tryGet(Servo.class, "garden2");
         // NO LAUNCHER ON THE ROBOT RIGHT NOW (Oct 2026). tryGet leaves this null instead
@@ -115,6 +117,9 @@ public class LlDrivemode extends LinearOpMode {
         intake.setDirection(DcMotorEx.Direction.FORWARD);
         intake.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         intake.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
+        intake2.setDirection(DcMotorEx.Direction.FORWARD);
+        intake2.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        intake2.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
         if (launcher != null) {
             launcher.setDirection(DcMotorEx.Direction.FORWARD);
             launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -388,7 +393,7 @@ public class LlDrivemode extends LinearOpMode {
             backRight.setPower(bR_Motor);
 
             // Intake motor's control
-            if (gamepad2.right_trigger > 0.0) { intake.setVelocity(gamepad2.right_trigger*1000); } else if (gamepad2.left_trigger > 0.0){ intake.setVelocity(-gamepad2.left_trigger*1000); } else { intake.setPower(0.0); }
+            if (gamepad2.right_trigger > 0.0) { intake.setVelocity(gamepad2.right_trigger*2800); intake2.setVelocity(gamepad2.right_trigger*2800); } else if (gamepad2.left_trigger > 0.0){ intake.setVelocity(-gamepad2.left_trigger*2800); intake2.setVelocity(-gamepad2.left_trigger*2800);} else { intake.setPower(0.0); intake2.setPower(0.0); }
 
             /* launcher brake toggler
             if (gamepad2.left_bumper) {
